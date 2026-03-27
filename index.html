@@ -1,59 +1,75 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Captura de ubicación - Teams</title>
-
-  <!-- SDK de Microsoft Teams -->
-  <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js"></script>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Diagnóstico de ubicación</title>
   <style>
-    body {
-      font-family: Segoe UI, Arial, sans-serif;
-      padding: 16px;
-    }
-    button {
-      padding: 10px 16px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    pre {
-      background: #f5f5f5;
-      padding: 12px;
-      margin-top: 12px;
-      white-space: pre-wrap;
-    }
+    body { font-family: Arial, sans-serif; padding: 16px; }
+    button { padding: 10px 14px; }
+    pre { background: #f5f5f5; padding: 12px; white-space: pre-wrap; }
   </style>
 </head>
-
 <body>
-  <h3>Ubicación del usuario</h3>
-  <button onclick="obtenerUbicacion()">Obtener ubicación</button>
-
-  <pre id="resultado"></pre>
+  <h2>Diagnóstico de ubicación</h2>
+  <button id="btn">Probar ubicación</button>
+  <pre id="log"></pre>
 
   <script>
-    async function initTeams() {
-      await microsoftTeams.app.initialize();
-    }
+    const log = (msg) => {
+      const el = document.getElementById("log");
+      el.textContent += msg + "\n";
+      console.log(msg);
+    };
 
-    async function obtenerUbicacion() {
-      try {
-        const location = await microsoftTeams.app.location.getLocation({
-          allowChooseLocation: false,
-          showMap: false
-        });
+    async function run() {
+      log("URL: " + location.href);
+      log("isSecureContext: " + window.isSecureContext);
+      log("navigator.geolocation existe: " + !!navigator.geolocation);
 
-        document.getElementById("resultado").innerText =
-          JSON.stringify(location, null, 2);
-
-      } catch (err) {
-        document.getElementById("resultado").innerText =
-          "Error obteniendo ubicación:\n" + JSON.stringify(err, null, 2);
+      if (!window.isSecureContext) {
+        log("ERROR: no es un contexto seguro (HTTPS obligatorio).");
+        return;
       }
+
+      if (!navigator.geolocation) {
+        log("ERROR: navigator.geolocation no está disponible.");
+        return;
+      }
+
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const status = await navigator.permissions.query({ name: "geolocation" });
+          log("permissions.query geolocation: " + status.state);
+          status.onchange = () => log("permiso cambió a: " + status.state);
+        } else {
+          log("permissions.query no disponible.");
+        }
+      } catch (e) {
+        log("No se pudo consultar permissions API: " + (e.message || e));
+      }
+
+      log("Solicitando ubicación...");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          log("OK");
+          log("lat: " + pos.coords.latitude);
+          log("lng: " + pos.coords.longitude);
+          log("accuracy: " + pos.coords.accuracy);
+        },
+        (err) => {
+          log("ERROR code: " + err.code);
+          log("ERROR message: " + err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
+        }
+      );
     }
 
-    initTeams();
+    document.getElementById("btn").addEventListener("click", run);
   </script>
 </body>
 </html>
